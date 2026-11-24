@@ -1,0 +1,1734 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>skoitter — Boss Red Team (Mt. Silver)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    /* Reset and base Dex Psych palette */
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', Arial, sans-serif;
+      background-color: #121212;
+      color: #efefef;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Custom Scrollbar matching Dex Psych */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #121212;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #3a3548;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #5b507a;
+    }
+
+    /* Lightweight static sheet grid background (no 3D or backdrop-blur lag on mobile) */
+    .dex-psych-backdrop {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background-color: #121212;
+      background-image:
+        linear-gradient(to right, rgba(138, 117, 214, 0.045) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(138, 117, 214, 0.045) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+
+    @keyframes panelReveal {
+      from {
+        opacity: 0;
+        transform: translateY(-3px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .animate-panel {
+      animation: panelReveal 0.14s ease-out forwards;
+    }
+
+    /* Responsive touch targets for mobile devices */
+    button,
+    [role="button"],
+    input {
+      touch-action: manipulation;
+    }
+
+    /* Spreadsheet-inspired Dex Psych containers */
+    .dex-sheet-box {
+      background-color: #161616;
+      border: 1.5px solid #8a75d6;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.65);
+    }
+
+    .dex-banner-header {
+      background-color: #452e5c;
+      border-bottom: 1.5px solid #8a75d6;
+      border-top-left-radius: 6px;
+      border-top-right-radius: 6px;
+    }
+
+    .dex-banner-sub {
+      background-color: #362348;
+      border-bottom: 1.5px solid #8a75d6;
+    }
+
+    .dex-section-bar {
+      background-color: #211d2b;
+      border-bottom: 1.5px solid #8a75d6;
+      color: #b4a7d6;
+    }
+
+    .dex-cell-box {
+      background-color: #121212;
+      border: 1px solid #3c3c3c;
+      border-radius: 6px;
+    }
+
+    /* Selected rival card highlight in gold & purple */
+    .red-rival-card-active {
+      background-color: #252131;
+      border-color: #f1c232 !important;
+      box-shadow: inset 0 0 0 1px rgba(241, 194, 50, 0.45);
+    }
+
+    /* Edit button styling */
+    .tactic-btn-edit {
+      background-color: rgba(241, 194, 50, 0.14);
+      border: 1px solid rgba(241, 194, 50, 0.45);
+      color: #f1c232;
+      transition: background-color 0.12s ease, color 0.12s ease;
+    }
+
+    .tactic-btn-edit:hover {
+      background-color: rgba(241, 194, 50, 0.25);
+      color: #ffffff;
+    }
+
+    .tactic-btn-edit[aria-pressed="true"] {
+      background-color: #f1c232;
+      border-color: #f1c232;
+      color: #121212;
+    }
+
+    .tree-branch-line {
+      border-left: 1.5px solid rgba(138, 117, 214, 0.45);
+    }
+
+    .delete-mode-active-box {
+      border-color: #f1c232 !important;
+      box-shadow: inset 0 0 0 1px rgba(241, 194, 50, 0.3);
+    }
+  </style>
+</head>
+<body class="selection:bg-[#8a75d6]/30 selection:text-[#f1c232] min-h-screen flex flex-col">
+
+  <!-- Subtle Dex Psych grid background -->
+  <div class="dex-psych-backdrop" aria-hidden="true"></div>
+
+  <!-- Top navigation bar with live Team Ready progress -->
+  <header class="sticky top-2 z-40 px-3 sm:px-6 pt-2">
+    <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-lg bg-[#211d2b] border-[1.5px] border-[#8a75d6] shadow-[0_2px_8px_rgba(0,0,0,0.65)]">
+      <div class="flex items-center gap-3 min-h-[40px]">
+        <div class="w-8 h-8 rounded-full bg-[#8a75d6] p-0.5 shrink-0">
+          <div class="w-full h-full rounded-full bg-[#121212] flex items-center justify-center relative overflow-hidden">
+            <div class="w-full h-1/2 bg-[#8a75d6] absolute top-0"></div>
+            <div class="w-full h-[2px] bg-[#121212] absolute top-1/2 -translate-y-1/2"></div>
+            <div class="w-2.5 h-2.5 rounded-full bg-[#f1c232] border-2 border-[#121212] z-10"></div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="font-extrabold tracking-wide text-sm sm:text-base text-[#b4a7d6]">skoitter</span>
+          <span class="text-[#594c7a] font-bold">/</span>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#252131] border border-[#594c7a] text-[#f1c232] text-xs font-bold">
+            <span class="w-1.5 h-1.5 rounded-full bg-[#f1c232]"></span>
+            <span>Boss Red</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Live Team Ready counter & progress bar -->
+      <div class="px-3 py-1.5 rounded bg-[#161616] border border-[#8a75d6] flex items-center gap-3 shrink-0 min-h-[40px]">
+        <div class="flex items-baseline gap-1.5">
+          <span class="text-[10px] uppercase tracking-wider text-[#b4a7d6] font-extrabold">Team Ready</span>
+          <span class="text-xs sm:text-sm font-extrabold text-white">
+            <span id="red-ready-count" class="text-[#f1c232]">0</span> / 6 <span>Ready</span>
+          </span>
+        </div>
+        <div class="w-20 sm:w-28 h-2.5 rounded bg-[#252131] border border-[#3c3c3c] overflow-hidden">
+          <div id="red-progress-bar" class="h-full bg-[#f1c232] transition-[width] duration-200" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Boss Red content -->
+  <main class="relative z-10 flex-1 max-w-6xl w-full mx-auto px-3 sm:px-6 pt-5 pb-20">
+
+    <!-- Dex Psych style banner -->
+    <section class="dex-sheet-box mb-6 overflow-hidden">
+      <div class="dex-banner-header px-4 sm:px-6 py-3.5 text-center">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#211d2b] border border-[#8a75d6] text-[#b4a7d6] text-[11px] font-extrabold uppercase tracking-wider mb-1.5">
+          <span class="w-2 h-2 rounded-full bg-[#f1c232]"></span>
+          <span>Mt. Silver • Post Choice Nerf</span>
+        </div>
+
+        <h1 class="text-2xl sm:text-4xl font-extrabold tracking-wide text-[#f1c232]">
+          BOSS <span class="text-[#b4a7d6] underline decoration-[#f1c232] underline-offset-4">RED TEAM (MT. SILVER)</span>
+        </h1>
+      </div>
+
+      <div class="dex-banner-sub px-4 sm:px-6 py-3">
+        <p class="text-xs sm:text-sm text-[#efefef] leading-relaxed">
+          Click any Pokémon to view its complete details right away: item, ability, EVs, nature, IVs, moves, and copy its set.
+        </p>
+      </div>
+    </section>
+
+    <!-- Single-click Pokémon detail drawer -->
+    <section id="pokemon-detail-drawer" aria-live="polite" class="mb-6 dex-sheet-box overflow-hidden">
+      <!-- Rendered dynamically via JavaScript -->
+    </section>
+
+    <!-- Interactive 6-Pokémon team grid -->
+    <div class="dex-sheet-box overflow-hidden">
+      <div class="dex-section-bar px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#b4a7d6]">
+          6 Team Pokémon (1 click opens full details)
+        </h2>
+        <span class="text-[11px] font-bold text-[#f1c232]">● No external links</span>
+      </div>
+
+      <div id="red-roster-grid" class="p-3.5 sm:p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 bg-[#161616]">
+        <!-- Rendered dynamically via JavaScript -->
+      </div>
+    </div>
+
+    <!-- Bottom section: Facing Red (Johto -> Red) with 14 possible Pokémon -->
+    <section id="red-rival-section" aria-labelledby="red-rival-heading" class="mt-9">
+      <div class="dex-sheet-box overflow-hidden mb-6">
+        <div class="dex-banner-header px-4 sm:px-6 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="text-[11px] font-extrabold uppercase tracking-wider text-[#b4a7d6]">
+              Select Region
+            </span>
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-[#211d2b] border border-[#8a75d6] min-h-[36px]">
+              <span class="w-2 h-2 rounded-full bg-[#f1c232]"></span>
+              <span class="text-xs sm:text-sm font-extrabold tracking-wide text-white">Johto</span>
+            </div>
+          </div>
+
+          <div class="inline-flex flex-wrap items-center gap-2.5 px-3 py-1.5 rounded bg-[#211d2b] border border-[#8a75d6] min-h-[40px]">
+            <span class="px-2 py-0.5 rounded bg-[#f1c232] text-[#121212] text-[11px] font-black uppercase tracking-wider">RED</span>
+            <span class="text-xs font-bold text-[#b4a7d6]">Rival Roster</span>
+            <span class="text-xs font-extrabold text-white">14 Possible Pokémon • 1 Click for Counters</span>
+          </div>
+        </div>
+
+        <div class="p-4 sm:p-6 bg-[#161616]">
+          <h2 id="red-rival-heading" class="text-xl sm:text-2xl font-extrabold text-[#b4a7d6] tracking-tight mb-1.5">
+            How to beat <span class="text-[#f1c232] underline decoration-[#8a75d6] underline-offset-4">Red</span>’s team (Johto)
+          </h2>
+          <p class="text-xs sm:text-sm text-[#efefef] leading-relaxed max-w-3xl">
+            Click any of Red’s 14 possible Pokémon to expand its weaknesses, collapsible options, and best counter from your 6-Pokémon team.
+          </p>
+
+          <!-- Expandable single-click panel for the selected rival Pokémon -->
+          <div id="red-rival-detail" aria-live="polite" class="mt-5">
+            <!-- Rendered dynamically via JavaScript -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Grid of Red's 14 possible Pokémon -->
+      <div class="dex-sheet-box overflow-hidden">
+        <div class="dex-section-bar px-4 py-2.5 flex items-center justify-between">
+          <span class="text-xs font-extrabold uppercase tracking-wider text-[#b4a7d6]">RED — 14 POSSIBLE POKÉMON</span>
+          <span class="text-[11px] font-bold text-[#f1c232]">MT. SILVER</span>
+        </div>
+        <div id="red-rival-grid" class="p-3.5 sm:p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 bg-[#161616]">
+          <!-- Rendered dynamically via JavaScript -->
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Floating notification toast styled like Dex Psych -->
+  <div id="copy-toast" class="fixed bottom-4 right-4 z-50 translate-y-20 opacity-0 pointer-events-none transition-[transform,opacity] duration-150 px-4 py-2.5 rounded bg-[#211d2b] border-[1.5px] border-[#f1c232] text-white text-xs sm:text-sm font-bold shadow-lg flex items-center gap-2.5">
+    <span class="w-2.5 h-2.5 rounded-full bg-[#f1c232]"></span>
+    <span id="copy-toast-text">Copied!</span>
+  </div>
+
+  <script>
+    const STORAGE_KEY_TEAM = 'skoitter_red_team_v2';
+    const STORAGE_KEY_RIVAL_OPTIONS = 'skoitter_red_rival_options_v3';
+
+    let selectedMonId = 'infernape';
+    let completedMons = {};
+    // Open state map per nodeId: { [nodeId]: boolean }
+    let rivalOpenNodes = {};
+    // Option tree per rivalId: { [rivalId]: Array<TreeNode> }
+    let rivalOptionsMap = {};
+    let deleteModeActive = false;
+    let deletedOptionHistory = [];
+    // Active editing state: { rivalId, nodeId, title, autoSaved } | null
+    let editingOptionState = null;
+    let persistDebounceTimer = null;
+
+    // Move badges styled in Dex Psych dark, lavender, and gold tones
+    const moveTypeStyles = {
+      Bug: 'bg-[#211d2b] border-[#8a75d6] text-[#c7d2fe]',
+      Normal: 'bg-[#1c1c21] border-[#594c7a] text-[#efefef]',
+      Fighting: 'bg-[#261d24] border-[#f1c232]/70 text-[#fde68a]',
+      Electric: 'bg-[#252131] border-[#f1c232] text-[#f1c232]',
+      Ice: 'bg-[#1c232d] border-[#76a5af] text-[#bae6fd]',
+      Rock: 'bg-[#231f2a] border-[#8a75d6]/70 text-[#e2d9f3]',
+      Flying: 'bg-[#201d2e] border-[#8a75d6] text-[#b4a7d6]',
+      Ground: 'bg-[#252028] border-[#c49a3c] text-[#f3d58d]',
+      Dark: 'bg-[#231b30] border-[#8a75d6] text-[#d8b4fe]'
+    };
+
+    try {
+      completedMons = JSON.parse(localStorage.getItem(STORAGE_KEY_TEAM) || '{}');
+    } catch (e) {
+      completedMons = {};
+    }
+
+    try {
+      const savedRivalOpts = JSON.parse(localStorage.getItem(STORAGE_KEY_RIVAL_OPTIONS) || 'null');
+      if (savedRivalOpts && typeof savedRivalOpts === 'object') {
+        rivalOptionsMap = savedRivalOpts;
+      }
+    } catch (e) {
+      rivalOptionsMap = {};
+    }
+
+    function persistRivalOptionsImmediate() {
+      if (persistDebounceTimer) {
+        clearTimeout(persistDebounceTimer);
+        persistDebounceTimer = null;
+      }
+      try {
+        localStorage.setItem(STORAGE_KEY_RIVAL_OPTIONS, JSON.stringify(rivalOptionsMap));
+      } catch (e) {
+        // Ignore private storage errors
+      }
+    }
+
+    function persistRivalOptionsDebounced(delay = 180) {
+      if (persistDebounceTimer) {
+        clearTimeout(persistDebounceTimer);
+      }
+      persistDebounceTimer = setTimeout(() => {
+        persistDebounceTimer = null;
+        try {
+          localStorage.setItem(STORAGE_KEY_RIVAL_OPTIONS, JSON.stringify(rivalOptionsMap));
+        } catch (e) {
+          // Ignore private storage errors
+        }
+      }, delay);
+    }
+
+    function persistRivalOptions() {
+      persistRivalOptionsImmediate();
+    }
+
+    const redTeamRoster = [
+      {
+        id: 'infernape',
+        dex: 392,
+        name: 'Infernape',
+        item: 'Choice Scarf',
+        itemSlug: 'choice-scarf',
+        ability: 'Blaze',
+        evs: '252 Atk / 252 Spe',
+        nature: 'Jolly Nature',
+        ivs: '31 Atk / 31 Spe',
+        ivNote: 'Jolly + Choice Scarf for speed control, U-turn pivoting, and locking moves with Encore.',
+        moves: [
+          { name: 'U-turn', type: 'Bug' },
+          { name: 'Encore', type: 'Normal' },
+          { name: 'Close Combat', type: 'Fighting' },
+          { name: 'Rock Climb', type: 'Normal' }
+        ],
+        showdown: 'Infernape @ Choice Scarf\nAbility: Blaze\nEVs: 252 Atk / 252 Spe\nJolly Nature\nIVs: 31 Atk / 31 Spe\n- U-turn\n- Encore\n- Close Combat\n- Rock Climb'
+      },
+      {
+        id: 'jolteon',
+        dex: 135,
+        name: 'Jolteon',
+        item: 'Expert Belt',
+        itemSlug: 'expert-belt',
+        ability: 'Volt Absorb',
+        evs: '252 SpA / 252 Spe',
+        nature: 'Timid Nature',
+        ivs: '31 SpA / 31 Spe',
+        ivNote: 'Timid + Expert Belt to boost super-effective coverage, set Yawn, or pivot cleanly via Volt Switch / Baton Pass.',
+        moves: [
+          { name: 'Yawn', type: 'Normal' },
+          { name: 'Volt Switch', type: 'Electric' },
+          { name: 'Hidden Power [Ice]', type: 'Ice' },
+          { name: 'Baton Pass', type: 'Normal' }
+        ],
+        showdown: 'Jolteon @ Expert Belt\nAbility: Volt Absorb\nEVs: 252 SpA / 252 Spe\nTimid Nature\nIVs: 31 SpA / 31 Spe\n- Yawn\n- Volt Switch\n- Hidden Power [Ice]\n- Baton Pass'
+      },
+      {
+        id: 'gliscor',
+        dex: 472,
+        name: 'Gliscor',
+        item: 'Flying Gem',
+        itemSlug: 'flying-gem',
+        ability: 'Hyper Cutter',
+        evs: '252 Atk / 252 Spe',
+        nature: 'Adamant Nature',
+        ivs: '31 Atk / 31 Spe (24+ HP / 24+ SpD for no crit RNG)',
+        ivNote: '24+ HP / 24+ SpD to minimize critical hit RNG; Flying Gem powers up Acrobatics after Swords Dance or Rock Polish.',
+        moves: [
+          { name: 'Swords Dance', type: 'Normal' },
+          { name: 'Rock Polish', type: 'Rock' },
+          { name: 'Acrobatics', type: 'Flying' },
+          { name: 'Earthquake', type: 'Ground' }
+        ],
+        showdown: 'Gliscor @ Flying Gem\nAbility: Hyper Cutter\nEVs: 252 Atk / 252 Spe\nAdamant Nature\nIVs: 31 Atk / 31 Spe\n- Swords Dance\n- Rock Polish\n- Acrobatics\n- Earthquake'
+      },
+      {
+        id: 'bisharp',
+        dex: 625,
+        name: 'Bisharp',
+        item: 'Life Orb',
+        itemSlug: 'life-orb',
+        ability: 'Defiant',
+        evs: '252 Atk / 252 SpD',
+        nature: 'Adamant Nature',
+        ivs: '31 Atk',
+        ivNote: '252 Atk / 252 SpD with Life Orb and Defiant; PP Up Sucker Punch to 6 PP so you never run low.',
+        moves: [
+          { name: 'Swords Dance', type: 'Normal' },
+          { name: 'Protect', type: 'Normal' },
+          { name: 'Sucker Punch (PP Up to 6)', type: 'Dark' },
+          { name: 'Low Kick', type: 'Fighting' }
+        ],
+        showdown: 'Bisharp @ Life Orb\nAbility: Defiant\nEVs: 252 Atk / 252 SpD\nAdamant Nature\nIVs: 31 Atk\n- Swords Dance\n- Protect\n- Sucker Punch\n- Low Kick'
+      },
+      {
+        id: 'weavile',
+        dex: 461,
+        name: 'Weavile',
+        item: 'Loaded Dice',
+        itemSlug: 'loaded-dice',
+        ability: 'Any',
+        evs: '230 Atk / 36 SpD / 244 Spe (or 252 Atk / 252 Spe if SpD IV is 28+)',
+        nature: 'Adamant Nature',
+        ivs: '31 HP / 31 Atk / 19 SpD / 31 Spe',
+        ivNote: '230 Atk / 36 SpD / 244 Spe with 19 SpD IV, or 252 Atk / 252 Spe if SpD IV is 28+. Loaded Dice maximizes Icicle Spear.',
+        moves: [
+          { name: 'Swords Dance', type: 'Normal' },
+          { name: 'Protect', type: 'Normal' },
+          { name: 'Icicle Spear', type: 'Ice' },
+          { name: 'Brick Break', type: 'Fighting' }
+        ],
+        showdown: 'Weavile @ Loaded Dice\nAbility: Pressure\nEVs: 230 Atk / 36 SpD / 244 Spe\nAdamant Nature\nIVs: 31 HP / 31 Atk / 19 SpD / 31 Spe\n- Swords Dance\n- Protect\n- Icicle Spear\n- Brick Break'
+      },
+      {
+        id: 'breloom',
+        dex: 286,
+        name: 'Breloom',
+        item: 'Black Belt',
+        itemSlug: 'black-belt',
+        ability: 'Technician',
+        evs: '252 Atk / 252 Spe',
+        nature: 'Adamant Nature',
+        ivs: '31 Atk / 31 Spe (25+ HP / 25+ SpD for no crit RNG)',
+        ivNote: '25+ HP / 25+ SpD to reduce crit RNG; Technician + Black Belt boosts Mach Punch and Brick Break.',
+        moves: [
+          { name: 'Swords Dance', type: 'Normal' },
+          { name: 'Protect', type: 'Normal' },
+          { name: 'Mach Punch', type: 'Fighting' },
+          { name: 'Brick Break', type: 'Fighting' }
+        ],
+        showdown: 'Breloom @ Black Belt\nAbility: Technician\nEVs: 252 Atk / 252 Spe\nAdamant Nature\nIVs: 31 Atk / 31 Spe\n- Swords Dance\n- Protect\n- Mach Punch\n- Brick Break'
+      }
+    ];
+
+    const extraMovePool = [
+      {
+        move: 'Swords Dance',
+        note: 'Use Swords Dance when forcing a clean switch or when status protection is active.'
+      },
+      {
+        move: 'Volt Switch',
+        note: 'Keep momentum with Jolteon and pass the turn to your safest physical attacker.'
+      },
+      {
+        move: 'Icicle Spear',
+        note: 'With Loaded Dice it hits multiple times in a row and breaks Focus Sash or Sturdy.'
+      },
+      {
+        move: 'Protect',
+        note: 'Scout the opponent’s first move or gain a safe turn without risk.'
+      }
+    ];
+
+    const redRivalRoster = [
+      {
+        id: 'pikachu',
+        dex: 25,
+        name: 'Pikachu',
+        types: ['Electric'],
+        weaknesses: ['Ground'],
+        bestCounters: ['Gliscor', 'Jolteon', 'Infernape'],
+        counterPlan: 'Weak to Ground: Gliscor easily checks it with Earthquake and setup; Jolteon can pivot around electric moves via Volt Absorb.'
+      },
+      {
+        id: 'venusaur',
+        dex: 3,
+        name: 'Venusaur',
+        types: ['Grass', 'Poison'],
+        weaknesses: ['Fire', 'Ice', 'Flying', 'Psychic'],
+        bestCounters: ['Gliscor', 'Weavile', 'Infernape'],
+        counterPlan: 'Weak to Fire, Ice, and Flying: Gliscor threatens with Flying Gem Acrobatics and Weavile pressures with Icicle Spear.'
+      },
+      {
+        id: 'charizard',
+        dex: 6,
+        name: 'Charizard',
+        types: ['Fire', 'Flying'],
+        weaknesses: ['Rock', 'Water', 'Electric'],
+        bestCounters: ['Jolteon', 'Weavile', 'Bisharp'],
+        counterPlan: 'Weak to Rock, Water, and Electric: Jolteon outspeeds to pivot with Volt Switch and team mates clean up after setup.'
+      },
+      {
+        id: 'espeon',
+        dex: 196,
+        name: 'Espeon',
+        types: ['Psychic'],
+        weaknesses: ['Bug', 'Ghost', 'Dark'],
+        bestCounters: ['Bisharp', 'Weavile', 'Infernape'],
+        counterPlan: 'Weak to Dark and Bug: Bisharp with Sucker Punch (6 PP) and Weavile hit hard; Infernape can U-turn or lock with Encore.'
+      },
+      {
+        id: 'blastoise',
+        dex: 9,
+        name: 'Blastoise',
+        types: ['Water'],
+        weaknesses: ['Electric', 'Grass'],
+        bestCounters: ['Jolteon', 'Breloom', 'Gliscor'],
+        counterPlan: 'Weak to Electric and Grass: Jolteon pressures with Volt Switch / Yawn and Breloom punishes with Technician moves.'
+      },
+      {
+        id: 'snorlax',
+        dex: 143,
+        name: 'Snorlax',
+        types: ['Normal'],
+        weaknesses: ['Fighting'],
+        bestCounters: ['Breloom', 'Infernape', 'Bisharp'],
+        counterPlan: 'Weak to Fighting: Breloom (Black Belt + Technician) with Mach Punch / Brick Break or Infernape with Close Combat breaks through.'
+      },
+      {
+        id: 'emboar',
+        dex: 500,
+        name: 'Emboar',
+        types: ['Fire', 'Fighting'],
+        weaknesses: ['Water', 'Ground', 'Flying', 'Psychic'],
+        bestCounters: ['Gliscor', 'Jolteon', 'Bisharp'],
+        counterPlan: 'Weak to Ground and Flying: Gliscor resists Fighting and strikes with Flying Gem Acrobatics or Earthquake.'
+      },
+      {
+        id: 'serperior',
+        dex: 497,
+        name: 'Serperior',
+        types: ['Grass'],
+        weaknesses: ['Fire', 'Ice', 'Poison', 'Flying', 'Bug'],
+        bestCounters: ['Weavile', 'Gliscor', 'Infernape'],
+        counterPlan: 'Weak to Ice, Flying, and Bug: Weavile hits with Icicle Spear, Gliscor with Flying Gem Acrobatics, and Infernape with U-turn.'
+      },
+      {
+        id: 'hydreigon',
+        dex: 635,
+        name: 'Hydreigon',
+        types: ['Dark', 'Dragon'],
+        weaknesses: ['Fighting', 'Bug', 'Ice', 'Dragon'],
+        bestCounters: ['Weavile', 'Breloom', 'Jolteon'],
+        counterPlan: 'Weak to Ice and Fighting: Weavile with Loaded Dice Icicle Spear and Jolteon with Hidden Power [Ice] punish it cleanly.'
+      },
+      {
+        id: 'excadrill',
+        dex: 530,
+        name: 'Excadrill',
+        types: ['Ground', 'Steel'],
+        weaknesses: ['Fire', 'Water', 'Fighting', 'Ground'],
+        bestCounters: ['Breloom', 'Infernape', 'Gliscor'],
+        counterPlan: 'Weak to Fighting, Fire, and Ground: Breloom with Mach Punch / Brick Break and Infernape with Close Combat answer it.'
+      },
+      {
+        id: 'samurott',
+        dex: 503,
+        name: 'Samurott',
+        types: ['Water'],
+        weaknesses: ['Electric', 'Grass'],
+        bestCounters: ['Jolteon', 'Breloom', 'Gliscor'],
+        counterPlan: 'Weak to Electric and Grass: Jolteon with Volt Switch / Yawn and Breloom with Brick Break / Mach Punch handle it well.'
+      },
+      {
+        id: 'staraptor',
+        dex: 398,
+        name: 'Staraptor',
+        types: ['Normal', 'Flying'],
+        weaknesses: ['Electric', 'Ice', 'Rock'],
+        bestCounters: ['Jolteon', 'Weavile', 'Bisharp'],
+        counterPlan: 'Weak to Electric and Ice: Jolteon pressures with Volt Switch and Weavile hits with Icicle Spear (watch out for Intimidate).'
+      },
+      {
+        id: 'gliscor',
+        dex: 472,
+        name: 'Gliscor',
+        types: ['Ground', 'Flying'],
+        weaknesses: ['Ice', 'Water'],
+        bestCounters: ['Weavile', 'Jolteon', 'Gliscor'],
+        counterPlan: '4x weak to Ice and weak to Water: Weavile with Loaded Dice Icicle Spear or Jolteon with Hidden Power [Ice] answers it cleanly.'
+      },
+      {
+        id: 'swampert',
+        dex: 260,
+        name: 'Swampert',
+        types: ['Water', 'Ground'],
+        weaknesses: ['Grass'],
+        bestCounters: ['Breloom', 'Jolteon', 'Weavile'],
+        counterPlan: '4x weak to Grass and immune to Electric: Breloom with Brick Break / Mach Punch melts it; avoid raw Volt Switch.'
+      }
+    ];
+
+    let selectedRivalId = 'pikachu';
+
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function getDefaultRowsForRival(rival) {
+      const c1 = rival.bestCounters[0] || 'Gliscor';
+      const c2 = rival.bestCounters[1] || 'Jolteon';
+      const c3 = rival.bestCounters[2] || 'Weavile';
+      const w1 = rival.weaknesses[0] || 'Ground';
+
+      return [
+        {
+          id: `${rival.id}-n-1`,
+          title: 'Close Combat',
+          children: [
+            {
+              id: `${rival.id}-n-1-1`,
+              title: `If ${rival.name} stays in → Pivot with ${c1} → Punish ${w1}`,
+              children: [
+                {
+                  id: `${rival.id}-n-1-1-1`,
+                  title: `If ${c1} is KO → Send ${c2} → Setup / Volt Switch → Clean sweep`,
+                  children: []
+                },
+                {
+                  id: `${rival.id}-n-1-1-2`,
+                  title: `If ${c1} is healthy → Boost / Encore → KO ${rival.name}`,
+                  children: []
+                }
+              ]
+            },
+            {
+              id: `${rival.id}-n-1-2`,
+              title: `If rival switches out → Send ${c2} → Volt Switch / U-turn`,
+              children: []
+            },
+            {
+              id: `${rival.id}-n-1-3`,
+              title: `If ${c3} enters → Setup or priority coverage → Finish`,
+              children: []
+            }
+          ]
+        }
+      ];
+    }
+
+    function ensureRivalTree(rival) {
+      if (!Array.isArray(rivalOptionsMap[rival.id])) {
+        rivalOptionsMap[rival.id] = getDefaultRowsForRival(rival);
+      }
+      return rivalOptionsMap[rival.id];
+    }
+
+    function countTreeNodes(nodes) {
+      if (!Array.isArray(nodes)) return 0;
+      return nodes.reduce((acc, n) => acc + 1 + countTreeNodes(n.children || []), 0);
+    }
+
+    function findNodeById(nodes, targetId) {
+      if (!Array.isArray(nodes)) return null;
+      for (const node of nodes) {
+        if (node.id === targetId) return node;
+        const found = findNodeById(node.children || [], targetId);
+        if (found) return found;
+      }
+      return null;
+    }
+
+    function expandAncestorsOfNode(nodes, targetId) {
+      if (!Array.isArray(nodes)) return false;
+      for (const node of nodes) {
+        if (node.id === targetId) return true;
+        if (expandAncestorsOfNode(node.children || [], targetId)) {
+          rivalOpenNodes[node.id] = true;
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function insertSiblingAfterNode(nodes, targetId, newNode) {
+      if (!Array.isArray(nodes)) return false;
+      const idx = nodes.findIndex((n) => n.id === targetId);
+      if (idx !== -1) {
+        nodes.splice(idx + 1, 0, newNode);
+        return true;
+      }
+      for (const node of nodes) {
+        if (!Array.isArray(node.children)) node.children = [];
+        if (insertSiblingAfterNode(node.children, targetId, newNode)) {
+          rivalOpenNodes[node.id] = true;
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function appendChildToNode(nodes, parentId, newNode) {
+      if (!Array.isArray(nodes)) return false;
+      for (const node of nodes) {
+        if (!Array.isArray(node.children)) node.children = [];
+        if (node.id === parentId) {
+          node.children.push(newNode);
+          rivalOpenNodes[node.id] = true;
+          return true;
+        }
+        if (appendChildToNode(node.children, parentId, newNode)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function removeNodeFromTree(nodes, targetId, parentId = null) {
+      if (!Array.isArray(nodes)) return null;
+      const idx = nodes.findIndex((n) => n.id === targetId);
+      if (idx !== -1) {
+        const [removed] = nodes.splice(idx, 1);
+        return { removed, parentId, index: idx };
+      }
+      for (const node of nodes) {
+        const res = removeNodeFromTree(node.children || [], targetId, node.id);
+        if (res) return res;
+      }
+      return null;
+    }
+
+    function reinsertRemovedNode(nodes, entry) {
+      if (!entry || !entry.removed) return;
+      if (!entry.parentId) {
+        const safeIdx = Math.max(0, Math.min(entry.index, nodes.length));
+        nodes.splice(safeIdx, 0, entry.removed);
+        return;
+      }
+      const parent = findNodeById(nodes, entry.parentId);
+      if (parent) {
+        if (!Array.isArray(parent.children)) parent.children = [];
+        const safeIdx = Math.max(0, Math.min(entry.index, parent.children.length));
+        parent.children.splice(safeIdx, 0, entry.removed);
+        rivalOpenNodes[parent.id] = true;
+      } else {
+        nodes.push(entry.removed);
+      }
+    }
+
+    function syncEditingDraftFromDom(immediate = false) {
+      if (!editingOptionState) return;
+      const titleEl = document.getElementById('edit-option-move');
+      if (!titleEl) return;
+
+      const rawValue = titleEl.value;
+      editingOptionState.title = rawValue;
+
+      const rival = redRivalRoster.find((r) => r.id === editingOptionState.rivalId);
+      if (!rival) return;
+      const tree = ensureRivalTree(rival);
+      const targetNode = findNodeById(tree, editingOptionState.nodeId);
+      if (!targetNode) return;
+
+      const cleanTitle = rawValue.trim() || 'New option';
+      targetNode.title = cleanTitle;
+      editingOptionState.autoSaved = true;
+
+      const labelEl = document.getElementById(`node-title-text-${targetNode.id}`);
+      if (labelEl) {
+        labelEl.textContent = cleanTitle;
+      }
+
+      if (immediate) {
+        persistRivalOptionsImmediate();
+      } else {
+        persistRivalOptionsDebounced(180);
+      }
+
+      const statusBadge = document.getElementById('autosave-status-badge');
+      if (statusBadge) {
+        statusBadge.textContent = '✓ Auto-saved';
+        statusBadge.className = 'text-[10px] font-bold px-2 py-0.5 rounded bg-[#211d2b] border border-[#f1c232] text-[#f1c232]';
+      }
+    }
+
+    function startEditingRivalOption(rivalId, nodeId) {
+      try {
+        syncEditingDraftFromDom(true);
+        const rival = redRivalRoster.find((r) => r.id === rivalId);
+        if (!rival) return;
+        const tree = ensureRivalTree(rival);
+        const node = findNodeById(tree, nodeId);
+        if (!node) return;
+
+        if (editingOptionState && editingOptionState.rivalId === rivalId && editingOptionState.nodeId === nodeId) {
+          cancelEditingRivalOption();
+          return;
+        }
+
+        rivalOpenNodes[node.id] = true;
+        expandAncestorsOfNode(tree, node.id);
+
+        editingOptionState = {
+          rivalId,
+          nodeId: node.id,
+          title: node.title || '',
+          autoSaved: false
+        };
+
+        renderRivalDetail();
+
+        requestAnimationFrame(() => {
+          const input = document.getElementById('edit-option-move');
+          if (input) input.focus();
+        });
+      } catch (err) {
+        showCopyToast('Unable to open editor');
+      }
+    }
+
+    function cancelEditingRivalOption() {
+      syncEditingDraftFromDom(true);
+      editingOptionState = null;
+      renderRivalDetail();
+    }
+
+    function saveEditingRivalOption(rivalId, nodeId) {
+      try {
+        syncEditingDraftFromDom(true);
+        if (!editingOptionState || editingOptionState.rivalId !== rivalId || editingOptionState.nodeId !== nodeId) {
+          return;
+        }
+
+        const rival = redRivalRoster.find((r) => r.id === rivalId);
+        if (!rival) return;
+        const tree = ensureRivalTree(rival);
+        const targetNode = findNodeById(tree, nodeId);
+        if (!targetNode) return;
+
+        const cleanTitle = (editingOptionState.title || '').trim() || 'New option';
+        targetNode.title = cleanTitle;
+
+        editingOptionState = null;
+        persistRivalOptionsImmediate();
+        renderRivalDetail();
+        showCopyToast('Changes saved!');
+      } catch (err) {
+        showCopyToast('Error saving changes');
+      }
+    }
+
+    function renderTreeNodesHtml(rivalId, nodes, depth, labels) {
+      if (!Array.isArray(nodes) || nodes.length === 0) return '';
+
+      return nodes.map((node) => {
+        const hasChildren = Array.isArray(node.children) && node.children.length > 0;
+        const isOpen = rivalOpenNodes[node.id] !== undefined ? !!rivalOpenNodes[node.id] : (depth === 0);
+        const isEditingThis =
+          editingOptionState &&
+          editingOptionState.rivalId === rivalId &&
+          editingOptionState.nodeId === node.id;
+
+        const activeTitle = isEditingThis ? editingOptionState.title : node.title;
+        const arrowIcon = hasChildren ? (isOpen ? '▼' : '▶') : '▸';
+
+        const rowBgClass = depth === 0
+          ? 'bg-[#211d2b] border-[#8a75d6]'
+          : depth === 1
+            ? 'bg-[#1b1824] border-[#594c7a]'
+            : 'bg-[#16141d] border-[#3c3c3c]';
+
+        return `
+          <div class="space-y-1.5">
+            <div class="rounded border transition-colors duration-100 ${
+              isEditingThis
+                ? 'border-[#f1c232] bg-[#252131]'
+                : deleteModeActive
+                  ? 'border-[#f1c232]/80 bg-[#252131]'
+                  : rowBgClass
+            }">
+              <div class="flex items-center justify-between gap-2 px-2.5 sm:px-3 py-2">
+                <button
+                  type="button"
+                  aria-expanded="${isOpen}"
+                  onclick="toggleRivalTreeNode('${rivalId}', '${node.id}')"
+                  class="flex-1 flex items-center gap-2 text-left py-1 px-1 rounded hover:bg-white/[0.04] transition-colors duration-100 cursor-pointer min-w-0 min-h-[40px]"
+                >
+                  <span class="text-[10px] w-3 text-center shrink-0 ${
+                    hasChildren ? (isOpen ? 'text-[#f1c232]' : 'text-[#b4a7d6]') : 'text-zinc-500'
+                  }">${arrowIcon}</span>
+                  <span class="font-black text-base leading-none text-[#f1c232] select-none shrink-0" aria-hidden="true">•</span>
+                  <span id="node-title-text-${node.id}" class="font-semibold text-xs sm:text-sm text-[#efefef] leading-snug break-words">${escapeHtml(activeTitle)}</span>
+                  ${isEditingThis ? `
+                    <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-[#f1c232] text-[#121212] shrink-0">
+                      ${labels.editingBadge}
+                    </span>
+                  ` : ''}
+                </button>
+
+                <div class="flex items-center gap-1.5 shrink-0" onclick="event.stopPropagation()">
+                  <button
+                    type="button"
+                    title="${labels.insertBelowTitle}"
+                    aria-label="${labels.insertBelowTitle}"
+                    onclick="event.stopPropagation(); insertRivalOptionBelow('${rivalId}', '${node.id}')"
+                    class="w-9 h-9 sm:w-8 sm:h-8 rounded bg-[#252131] hover:bg-[#342e47] border border-[#8a75d6] text-[#b4a7d6] hover:text-white flex items-center justify-center text-sm font-black transition-colors duration-100 cursor-pointer"
+                  >
+                    +
+                  </button>
+
+                  <button
+                    type="button"
+                    title="${labels.addSubOptionTitle}"
+                    aria-label="${labels.addSubOptionTitle}"
+                    onclick="event.stopPropagation(); addSubRivalOption('${rivalId}', '${node.id}')"
+                    class="px-2.5 h-9 sm:h-8 rounded bg-[#252131] hover:bg-[#342e47] border border-[#594c7a] text-[#f1c232] hover:text-white flex items-center justify-center text-[11px] font-extrabold transition-colors duration-100 cursor-pointer"
+                  >
+                    ↳+
+                  </button>
+
+                  <button
+                    type="button"
+                    aria-pressed="${!!isEditingThis}"
+                    title="${labels.editRowTitle}"
+                    aria-label="${labels.editRowTitle}"
+                    onclick="event.stopPropagation(); startEditingRivalOption('${rivalId}', '${node.id}')"
+                    class="tactic-btn-edit w-9 h-9 sm:w-8 sm:h-8 rounded flex items-center justify-center cursor-pointer"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
+                  </button>
+
+                  ${deleteModeActive ? `
+                    <button
+                      type="button"
+                      title="${labels.deleteRowTitle}"
+                      aria-label="${labels.deleteRowTitle}"
+                      onclick="event.stopPropagation(); deleteRivalOption('${rivalId}', '${node.id}')"
+                      class="w-9 h-9 sm:w-8 sm:h-8 rounded bg-[#f1c232] hover:bg-[#ffd966] border border-[#f1c232] text-[#121212] flex items-center justify-center transition-colors duration-100 cursor-pointer"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></svg>
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+
+              ${isEditingThis ? `
+                <div
+                  onclick="event.stopPropagation()"
+                  class="animate-panel px-3.5 py-3 bg-[#121212] border-t border-[#f1c232]/70 space-y-2.5"
+                >
+                  <div>
+                    <div class="flex items-center justify-between gap-2 mb-1.5">
+                      <label for="edit-option-move" class="block text-[11px] font-bold text-[#b4a7d6]">
+                        ${labels.labelMove}
+                      </label>
+                      <span id="autosave-status-badge" class="text-[10px] font-bold px-2 py-0.5 rounded bg-[#211d2b] border border-[#8a75d6] text-[#f1c232]">
+                        ${editingOptionState.autoSaved ? labels.autoSavedBadge : labels.autoSaveHint}
+                      </span>
+                    </div>
+                    <input
+                      id="edit-option-move"
+                      type="text"
+                      value="${escapeHtml(editingOptionState.title)}"
+                      placeholder="${escapeHtml(labels.placeholderMove)}"
+                      oninput="syncEditingDraftFromDom(false)"
+                      onblur="syncEditingDraftFromDom(true)"
+                      onkeydown="if(event.key==='Enter'){event.preventDefault();saveEditingRivalOption('${rivalId}', '${node.id}');}else if(event.key==='Escape'){event.preventDefault();cancelEditingRivalOption();}"
+                      class="w-full min-h-[42px] px-3 py-2 rounded bg-[#161616] border border-[#594c7a] focus:border-[#f1c232] focus:outline-none text-xs sm:text-sm text-white font-semibold"
+                    />
+                  </div>
+
+                  <div class="flex items-center justify-end gap-2 pt-0.5">
+                    <button
+                      type="button"
+                      onclick="cancelEditingRivalOption()"
+                      class="min-h-[40px] px-3.5 py-1.5 rounded bg-[#211d2b] hover:bg-[#2c263a] border border-[#594c7a] text-[#b4a7d6] text-xs font-bold transition-colors duration-100 cursor-pointer"
+                    >
+                      ${labels.cancelBtn}
+                    </button>
+                    <button
+                      type="button"
+                      onclick="saveEditingRivalOption('${rivalId}', '${node.id}')"
+                      class="min-h-[40px] px-4 py-1.5 rounded bg-[#f1c232] hover:bg-[#ffd966] border border-[#f1c232] text-[#121212] text-xs font-extrabold transition-colors duration-100 cursor-pointer"
+                    >
+                      ${labels.saveBtn}
+                    </button>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+
+            ${(isOpen && hasChildren) ? `
+              <div class="ml-2.5 sm:ml-5 pl-2.5 sm:pl-4 tree-branch-line space-y-1.5">
+                ${renderTreeNodesHtml(rivalId, node.children, depth + 1, labels)}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderRivalDetail() {
+      const container = document.getElementById('red-rival-detail');
+      if (!container) return;
+      const rival = redRivalRoster.find((r) => r.id === selectedRivalId) || redRivalRoster[0];
+      const tree = ensureRivalTree(rival);
+      const totalOptions = countTreeNodes(tree);
+
+      const labels = {
+        weaknesses: 'Weaknesses',
+        optionsTitle: 'MOVE & STRATEGY OPTIONS (1 CLICK TO EXPAND)',
+        addOption: '+ Add option',
+        addAnotherOption: '+ Add another option',
+        deleteModeOff: 'Delete Mode: OFF',
+        deleteModeOn: 'Delete Mode: ON',
+        deleteBanner: 'Delete Mode ON: click the trash button on any option row to delete it immediately.',
+        deleteRowTitle: 'Delete this option',
+        editRowTitle: 'Edit option text',
+        insertBelowTitle: 'Add another option below this one',
+        addSubOptionTitle: 'Add a nested sub-option under this one',
+        restoreDefaults: 'Restore defaults',
+        undoDelete: 'Undo',
+        emptyOptions: 'No options left in this list. Click "+ Add option" or "Restore defaults".',
+        labelMove: 'Text / Move / Condition',
+        placeholderMove: 'e.g. Close Combat or If Venusaur comes in → Swap Weavile...',
+        saveBtn: 'Save',
+        cancelBtn: 'Close',
+        editingBadge: 'EDITING',
+        autoSaveHint: 'Auto-save active',
+        autoSavedBadge: '✓ Auto-saved'
+      };
+
+      const treeHtml = tree.length > 0
+        ? renderTreeNodesHtml(rival.id, tree, 0, labels)
+        : `
+          <div class="rounded border border-dashed border-[#594c7a] bg-[#121212] px-4 py-6 text-center text-xs sm:text-sm text-[#b4a7d6]">
+            ${labels.emptyOptions}
+          </div>
+        `;
+
+      container.innerHTML = `
+        <div class="animate-panel rounded bg-[#121212] border-[1.5px] border-[#8a75d6] p-4 sm:p-5">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+              <div class="w-16 h-16 sm:w-20 sm:h-20 rounded bg-[#211d2b] border border-[#8a75d6] flex items-center justify-center shrink-0">
+                <img
+                  src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${rival.dex}.png"
+                  alt="${rival.name}"
+                  width="64"
+                  height="64"
+                  loading="lazy"
+                  decoding="async"
+                  class="w-14 h-14 sm:w-16 sm:h-16 object-contain"
+                  style="image-rendering: pixelated;"
+                />
+              </div>
+              <div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <h3 class="text-xl sm:text-2xl font-extrabold text-[#b4a7d6] underline decoration-[#f1c232] underline-offset-2">${rival.name}</h3>
+                  <span class="text-xs font-mono text-zinc-400">#${String(rival.dex).padStart(3, '0')}</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  ${rival.types.map((t) => `
+                    <span class="px-2 py-0.5 rounded bg-[#252131] border border-[#594c7a] text-[11px] font-bold text-[#efefef]">${t}</span>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row md:flex-col items-start sm:items-center md:items-end gap-2">
+              <span class="text-[10px] font-extrabold uppercase tracking-wider text-[#f1c232]">${labels.weaknesses}</span>
+              <div class="flex flex-wrap gap-1.5">
+                ${rival.weaknesses.map((w) => `
+                  <span class="px-2.5 py-1 rounded bg-[#252131] border border-[#8a75d6] text-[#f1c232] text-xs font-extrabold">${w}</span>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 pt-4 border-t border-[#3c3c3c]">
+            <div class="flex flex-wrap items-center justify-between gap-2.5 mb-2.5">
+              <span class="text-[11px] font-extrabold uppercase tracking-wider text-[#b4a7d6]">${labels.optionsTitle}</span>
+              <div class="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  aria-pressed="${deleteModeActive}"
+                  onclick="toggleDeleteMode()"
+                  class="min-h-[40px] px-3 py-1.5 rounded text-xs font-extrabold border transition-colors duration-100 cursor-pointer ${
+                    deleteModeActive
+                      ? 'bg-[#f1c232] hover:bg-[#ffd966] border-[#f1c232] text-[#121212]'
+                      : 'bg-[#252131] hover:bg-[#342e47] border-[#594c7a] text-[#f1c232]'
+                  }"
+                >
+                  ${deleteModeActive ? labels.deleteModeOn : labels.deleteModeOff}
+                </button>
+
+                ${deletedOptionHistory.length > 0 ? `
+                  <button
+                    type="button"
+                    onclick="undoDeleteRivalOption()"
+                    class="min-h-[40px] px-3 py-1.5 rounded bg-[#252131] hover:bg-[#342e47] border border-[#f1c232]/70 text-[#f1c232] text-xs font-bold transition-colors duration-100 cursor-pointer"
+                  >
+                    ${labels.undoDelete} (${deletedOptionHistory.length})
+                  </button>
+                ` : ''}
+
+                <button
+                  type="button"
+                  onclick="restoreDefaultRivalOptions('${rival.id}')"
+                  class="min-h-[40px] px-3 py-1.5 rounded bg-[#211d2b] hover:bg-[#2c263a] border border-[#594c7a] text-[#b4a7d6] text-xs font-bold transition-colors duration-100 cursor-pointer"
+                >
+                  ${labels.restoreDefaults}
+                </button>
+
+                <button
+                  type="button"
+                  onclick="addMoreRivalOption('${rival.id}')"
+                  class="min-h-[40px] px-3.5 py-1.5 rounded bg-[#8a75d6] hover:bg-[#9f8ce6] border border-[#8a75d6] text-[#121212] text-xs font-extrabold transition-colors duration-100 cursor-pointer"
+                >
+                  ${labels.addOption}
+                </button>
+              </div>
+            </div>
+
+            ${deleteModeActive ? `
+              <div class="animate-panel mb-2.5 px-3.5 py-2 rounded bg-[#252131] border border-[#f1c232] text-[#f1c232] text-xs font-semibold flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-[#f1c232] shrink-0"></span>
+                <span>${labels.deleteBanner}</span>
+              </div>
+            ` : ''}
+
+            <div class="space-y-1.5 max-h-[28rem] overflow-y-auto pr-1 rounded ${deleteModeActive ? 'delete-mode-active-box p-1' : ''}">
+              ${treeHtml}
+            </div>
+
+            <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <span class="text-[11px] font-mono text-[#b4a7d6]">
+                ${totalOptions} ${totalOptions === 1 ? 'option' : 'options'}
+              </span>
+              <button
+                type="button"
+                onclick="addMoreRivalOption('${rival.id}', true)"
+                class="min-h-[40px] inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-[#252131] hover:bg-[#342e47] border border-[#8a75d6] text-[#b4a7d6] hover:text-white text-xs font-extrabold transition-colors duration-100 cursor-pointer"
+              >
+                ${labels.addAnotherOption}
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function toggleRivalTreeNode(rivalId, nodeId) {
+      if (editingOptionState && editingOptionState.rivalId === rivalId && editingOptionState.nodeId === nodeId) {
+        syncEditingDraftFromDom(true);
+      }
+      const rival = redRivalRoster.find((r) => r.id === rivalId);
+      const tree = rival ? ensureRivalTree(rival) : [];
+      const currentOpen = rivalOpenNodes[nodeId] !== undefined ? !!rivalOpenNodes[nodeId] : true;
+      rivalOpenNodes[nodeId] = !currentOpen;
+      if (rivalOpenNodes[nodeId] && tree.length > 0) {
+        expandAncestorsOfNode(tree, nodeId);
+      }
+      renderRivalDetail();
+    }
+
+    function toggleDeleteMode() {
+      deleteModeActive = !deleteModeActive;
+      renderRivalDetail();
+      showCopyToast(deleteModeActive ? 'Delete Mode enabled' : 'Delete Mode disabled');
+    }
+
+    function deleteRivalOption(rivalId, nodeId) {
+      try {
+        const rival = redRivalRoster.find((r) => r.id === rivalId);
+        if (!rival) return;
+        const tree = ensureRivalTree(rival);
+        const removedEntry = removeNodeFromTree(tree, nodeId);
+        if (!removedEntry) return;
+
+        if (editingOptionState && editingOptionState.rivalId === rivalId && editingOptionState.nodeId === nodeId) {
+          editingOptionState = null;
+        }
+
+        deletedOptionHistory.push({
+          rivalId,
+          entry: removedEntry
+        });
+
+        delete rivalOpenNodes[nodeId];
+        persistRivalOptionsImmediate();
+        renderRivalDetail();
+        showCopyToast(`Deleted: ${removedEntry.removed.title}`);
+      } catch (err) {
+        showCopyToast('Error deleting option');
+      }
+    }
+
+    function insertRivalOptionBelow(rivalId, targetNodeId) {
+      try {
+        syncEditingDraftFromDom(true);
+        const rival = redRivalRoster.find((r) => r.id === rivalId);
+        if (!rival) return;
+        const tree = ensureRivalTree(rival);
+
+        const total = countTreeNodes(tree);
+        const template = extraMovePool[total % extraMovePool.length];
+        const uniqueId = `${rival.id}-n-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+
+        const newNode = {
+          id: uniqueId,
+          title: `${template.move} → New option`,
+          children: []
+        };
+
+        const inserted = insertSiblingAfterNode(tree, targetNodeId, newNode);
+        if (!inserted) return;
+
+        rivalOpenNodes[newNode.id] = true;
+        editingOptionState = {
+          rivalId,
+          nodeId: newNode.id,
+          title: newNode.title
+        };
+
+        persistRivalOptionsImmediate();
+        renderRivalDetail();
+
+        requestAnimationFrame(() => {
+          const input = document.getElementById('edit-option-move');
+          if (input) {
+            input.focus();
+            input.select();
+          }
+        });
+
+        showCopyToast('Option added below');
+      } catch (err) {
+        showCopyToast('Error inserting option');
+      }
+    }
+
+    function addSubRivalOption(rivalId, parentNodeId) {
+      try {
+        syncEditingDraftFromDom(true);
+        const rival = redRivalRoster.find((r) => r.id === rivalId);
+        if (!rival) return;
+        const tree = ensureRivalTree(rival);
+
+        const total = countTreeNodes(tree);
+        const template = extraMovePool[total % extraMovePool.length];
+        const uniqueId = `${rival.id}-n-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+
+        const subNode = {
+          id: uniqueId,
+          title: `If rival switches → ${template.move}`,
+          children: []
+        };
+
+        const added = appendChildToNode(tree, parentNodeId, subNode);
+        if (!added) return;
+
+        rivalOpenNodes[subNode.id] = true;
+        editingOptionState = {
+          rivalId,
+          nodeId: subNode.id,
+          title: subNode.title
+        };
+
+        persistRivalOptionsImmediate();
+        renderRivalDetail();
+
+        requestAnimationFrame(() => {
+          const input = document.getElementById('edit-option-move');
+          if (input) {
+            input.focus();
+            input.select();
+          }
+        });
+
+        showCopyToast('Sub-option added');
+      } catch (err) {
+        showCopyToast('Error adding sub-option');
+      }
+    }
+
+    function undoDeleteRivalOption() {
+      try {
+        const last = deletedOptionHistory.pop();
+        if (!last || !last.entry) return;
+        const rival = redRivalRoster.find((r) => r.id === last.rivalId);
+        if (!rival) return;
+        const tree = ensureRivalTree(rival);
+        reinsertRemovedNode(tree, last.entry);
+        selectedRivalId = last.rivalId;
+        persistRivalOptionsImmediate();
+        renderRivalDetail();
+        renderRedRivalGrid();
+        showCopyToast(`Restored: ${last.entry.removed.title}`);
+      } catch (err) {
+        showCopyToast('Unable to undo');
+      }
+    }
+
+    function restoreDefaultRivalOptions(rivalId) {
+      try {
+        const rival = redRivalRoster.find((r) => r.id === rivalId);
+        if (!rival) return;
+        if (editingOptionState && editingOptionState.rivalId === rivalId) {
+          editingOptionState = null;
+        }
+        rivalOptionsMap[rival.id] = getDefaultRowsForRival(rival);
+        rivalOpenNodes = {};
+        persistRivalOptionsImmediate();
+        renderRivalDetail();
+        showCopyToast('Default options restored');
+      } catch (err) {
+        showCopyToast('Error restoring options');
+      }
+    }
+
+    function addMoreRivalOption(rivalId, autoEdit = true) {
+      try {
+        syncEditingDraftFromDom(true);
+        const rival = redRivalRoster.find((r) => r.id === rivalId);
+        if (!rival) return;
+        const tree = ensureRivalTree(rival);
+        const total = countTreeNodes(tree);
+        const template = extraMovePool[total % extraMovePool.length];
+        const uniqueId = `${rival.id}-n-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+
+        const newNode = {
+          id: uniqueId,
+          title: `${template.move} — New option`,
+          children: []
+        };
+
+        tree.push(newNode);
+        rivalOpenNodes[newNode.id] = true;
+
+        if (autoEdit) {
+          editingOptionState = {
+            rivalId,
+            nodeId: newNode.id,
+            title: newNode.title
+          };
+        }
+
+        persistRivalOptionsImmediate();
+        renderRivalDetail();
+
+        if (autoEdit) {
+          requestAnimationFrame(() => {
+            const input = document.getElementById('edit-option-move');
+            if (input) {
+              input.focus();
+              input.select();
+            }
+          });
+        }
+
+        showCopyToast('New option added');
+      } catch (err) {
+        showCopyToast('Error adding option');
+      }
+    }
+
+    function renderRedRivalGrid() {
+      const grid = document.getElementById('red-rival-grid');
+      if (!grid) return;
+
+      grid.innerHTML = redRivalRoster.map((rival) => {
+        const isActive = rival.id === selectedRivalId;
+        return `
+          <div
+            role="button"
+            tabindex="0"
+            aria-expanded="${isActive}"
+            onclick="selectRivalPokemon('${rival.id}')"
+            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectRivalPokemon('${rival.id}');}"
+            class="group min-h-[44px] rounded overflow-hidden text-left transition-colors duration-100 cursor-pointer select-none border flex flex-col justify-between ${
+              isActive
+                ? 'red-rival-card-active'
+                : 'bg-[#121212] border-[#3c3c3c] hover:border-[#8a75d6] hover:bg-[#1c1926]'
+            }"
+          >
+            <div class="p-3.5 flex items-center justify-center bg-[#161616]">
+              <img
+                src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${rival.dex}.png"
+                alt="${rival.name}"
+                width="72"
+                height="72"
+                loading="lazy"
+                decoding="async"
+                class="w-16 h-16 sm:w-18 sm:h-18 object-contain"
+                style="image-rendering: pixelated;"
+              />
+            </div>
+
+            <div class="px-3 py-2.5 bg-[#252131] border-t border-[#3c3c3c] text-center">
+              <span class="block text-xs sm:text-sm font-extrabold text-white truncate">${rival.name}</span>
+              <span class="block text-[10px] font-bold mt-0.5 ${isActive ? 'text-[#f1c232]' : 'text-[#b4a7d6] group-hover:text-[#f1c232]'}">
+                ${isActive ? 'Expanded ▲' : 'View counter +'}
+              </span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectRivalPokemon(id) {
+      if (editingOptionState && editingOptionState.rivalId !== id) {
+        syncEditingDraftFromDom(true);
+        editingOptionState = null;
+      }
+      selectedRivalId = id;
+      renderRivalDetail();
+      renderRedRivalGrid();
+    }
+
+    function renderDetailDrawer() {
+      const drawer = document.getElementById('pokemon-detail-drawer');
+      if (!drawer) return;
+      const mon = redTeamRoster.find((m) => m.id === selectedMonId) || redTeamRoster[0];
+      const isReady = !!completedMons[mon.id];
+
+      const labels = {
+        badge: 'Complete Info',
+        item: 'Item',
+        ability: 'Ability',
+        nature: 'Nature',
+        evs: 'EVs',
+        ivs: 'IVs',
+        moves: 'Moves',
+        copySet: 'Copy Set',
+        markReady: isReady ? '✓ Ready' : 'Mark Ready'
+      };
+
+      drawer.innerHTML = `
+        <div class="dex-section-bar px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2">
+          <span class="text-xs font-extrabold uppercase tracking-wider text-[#b4a7d6]">${labels.badge}</span>
+          <span class="text-xs font-extrabold text-[#f1c232]">#${String(mon.dex).padStart(3, '0')} — ${mon.name.toUpperCase()}</span>
+        </div>
+
+        <div class="animate-panel p-4 sm:p-6 bg-[#161616]">
+          <div class="flex flex-col lg:flex-row gap-6 items-start">
+
+            <div class="flex sm:items-center lg:items-start flex-col sm:flex-row lg:flex-col gap-4 lg:w-64 shrink-0">
+              <div class="w-24 h-24 sm:w-28 sm:h-28 rounded bg-[#211d2b] border-[1.5px] border-[#8a75d6] flex items-center justify-center relative">
+                <img
+                  src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${mon.dex}.png"
+                  alt="${mon.name}"
+                  width="76"
+                  height="76"
+                  loading="lazy"
+                  decoding="async"
+                  class="w-[72px] h-[72px] object-contain"
+                  style="image-rendering: pixelated;"
+                />
+                <span class="absolute -bottom-2.5 px-2.5 py-0.5 rounded bg-[#252131] border border-[#8a75d6] text-[10px] font-mono font-bold text-[#f1c232]">
+                  #${String(mon.dex).padStart(3, '0')}
+                </span>
+              </div>
+
+              <div>
+                <h3 class="text-xl sm:text-2xl font-extrabold text-[#b4a7d6] underline decoration-[#f1c232] underline-offset-2">${mon.name} @ <span class="text-[#f1c232]">${mon.item}</span></h3>
+
+                <div class="flex flex-wrap items-center gap-2 mt-3.5">
+                  <button
+                    type="button"
+                    onclick="copySingleSet('${mon.id}')"
+                    class="min-h-[40px] inline-flex items-center gap-1.5 px-3.5 py-2 rounded bg-[#f1c232] hover:bg-[#ffd966] text-[#121212] text-xs font-extrabold transition-colors duration-100 cursor-pointer"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>
+                    <span>${labels.copySet}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onclick="toggleMonReady('${mon.id}')"
+                    class="min-h-[40px] px-3.5 py-2 rounded text-xs font-extrabold border transition-colors duration-100 cursor-pointer ${
+                      isReady
+                        ? 'bg-[#f1c232] text-[#121212] border-[#f1c232]'
+                        : 'bg-[#252131] hover:bg-[#342e47] text-[#b4a7d6] border-[#594c7a]'
+                    }"
+                  >
+                    ${labels.markReady}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex-1 w-full space-y-3">
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="dex-cell-box p-3">
+                  <span class="block text-[10px] font-extrabold uppercase tracking-wider text-[#b4a7d6] mb-1">${labels.item}</span>
+                  <div class="flex items-center gap-2">
+                    <img
+                      src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${mon.itemSlug}.png"
+                      onerror="this.style.display='none';"
+                      alt="${mon.item}"
+                      width="20"
+                      height="20"
+                      loading="lazy"
+                      decoding="async"
+                      class="w-5 h-5 object-contain shrink-0"
+                    />
+                    <span class="text-xs sm:text-sm font-bold text-white">${mon.item}</span>
+                  </div>
+                </div>
+
+                <div class="dex-cell-box p-3">
+                  <span class="block text-[10px] font-extrabold uppercase tracking-wider text-[#b4a7d6] mb-1">${labels.ability}</span>
+                  <span class="text-xs sm:text-sm font-bold text-[#f1c232]">${mon.ability}</span>
+                </div>
+
+                <div class="dex-cell-box p-3">
+                  <span class="block text-[10px] font-extrabold uppercase tracking-wider text-[#b4a7d6] mb-1">${labels.nature}</span>
+                  <span class="text-xs sm:text-sm font-bold text-[#b4a7d6]">${mon.nature}</span>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="dex-cell-box p-3.5">
+                  <span class="block text-[10px] font-extrabold uppercase tracking-wider text-[#f1c232] mb-1">${labels.evs}</span>
+                  <p class="font-mono text-xs sm:text-sm font-bold text-[#efefef] leading-relaxed">${mon.evs}</p>
+                </div>
+
+                <div class="p-3.5 rounded bg-[#252131] border border-[#8a75d6]">
+                  <span class="block text-[10px] font-extrabold uppercase tracking-wider text-[#f1c232] mb-1">${labels.ivs}</span>
+                  <p class="font-mono text-xs sm:text-sm font-semibold text-white leading-relaxed">${mon.ivs}</p>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
+                <div class="lg:col-span-6 dex-cell-box p-3.5 flex flex-col justify-center">
+                  <p class="text-xs sm:text-sm text-[#efefef] leading-relaxed">${mon.ivNote}</p>
+                </div>
+
+                <div class="lg:col-span-6 dex-cell-box p-3.5">
+                  <span class="block text-[10px] font-extrabold uppercase tracking-wider text-[#b4a7d6] mb-2">${labels.moves}</span>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    ${mon.moves.map((m) => `
+                      <span class="px-2.5 py-2 rounded border text-xs font-bold text-center ${moveTypeStyles[m.type] || moveTypeStyles.Normal}">
+                        - ${m.name}
+                      </span>
+                    `).join('')}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      `;
+    }
+
+    function renderRedRoster() {
+      const grid = document.getElementById('red-roster-grid');
+      if (!grid) return;
+
+      grid.innerHTML = redTeamRoster.map((mon) => {
+        const isSelected = mon.id === selectedMonId;
+        const isDone = !!completedMons[mon.id];
+
+        return `
+          <div
+            role="button"
+            tabindex="0"
+            onclick="selectPokemon('${mon.id}')"
+            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectPokemon('${mon.id}');}"
+            class="group min-h-[44px] relative rounded overflow-hidden text-left transition-colors duration-100 cursor-pointer select-none border flex flex-col justify-between ${
+              isDone
+                ? 'bg-[#f1c232] border-[#f1c232] text-[#121212]'
+                : isSelected
+                  ? 'bg-[#252131] border-[#f1c232] shadow-[inset_0_0_0_1px_rgba(241,194,50,0.35)]'
+                  : 'bg-[#121212] border-[#3c3c3c] hover:border-[#8a75d6] hover:bg-[#1c1926]'
+            }"
+          >
+            <div class="p-4 flex items-center justify-between gap-3">
+              <div class="flex items-center gap-3.5 min-w-0">
+                <div class="w-14 h-14 rounded bg-[#211d2b] border border-[#594c7a] flex items-center justify-center shrink-0">
+                  <img
+                    src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${mon.dex}.png"
+                    alt="${mon.name}"
+                    width="48"
+                    height="48"
+                    loading="lazy"
+                    decoding="async"
+                    class="w-11 h-11 object-contain"
+                    style="image-rendering: pixelated;"
+                  />
+                </div>
+                <div class="min-w-0">
+                  <h3 class="text-base sm:text-lg font-extrabold truncate ${isDone ? 'text-[#121212]' : 'text-white'}">${mon.name}</h3>
+                  <div class="inline-flex items-center gap-1.5 mt-0.5 text-xs font-bold ${isDone ? 'text-[#121212]' : 'text-[#f1c232]'}">
+                    <img
+                      src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${mon.itemSlug}.png"
+                      onerror="this.style.display='none';"
+                      alt="${mon.item}"
+                      width="16"
+                      height="16"
+                      loading="lazy"
+                      decoding="async"
+                      class="w-4 h-4 object-contain shrink-0"
+                    />
+                    <span class="truncate">@ ${mon.item}</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onclick="event.stopPropagation(); copySingleSet('${mon.id}')"
+                class="min-h-[40px] px-3 py-1.5 rounded text-xs font-extrabold border transition-colors duration-100 shrink-0 cursor-pointer ${
+                  isDone
+                    ? 'bg-[#121212] text-[#f1c232] border-[#121212] hover:bg-[#211d2b]'
+                    : 'bg-[#252131] hover:bg-[#342e47] border-[#594c7a] text-[#b4a7d6] hover:text-white'
+                }"
+              >
+                Copy
+              </button>
+            </div>
+
+            <div class="px-4 py-2.5 border-t flex items-center justify-between gap-2 text-[11px] ${
+              isDone
+                ? 'bg-[#e0b224] border-[#121212]/20 text-[#121212] font-bold'
+                : 'bg-[#211d2b] border-[#3c3c3c] text-[#b4a7d6]'
+            }">
+              <span class="truncate">${mon.ability} • ${mon.nature}</span>
+              <span class="font-extrabold shrink-0 ${isDone ? 'text-[#121212]' : isSelected ? 'text-[#f1c232]' : 'text-[#efefef] group-hover:text-[#f1c232]'}">
+                ${isSelected ? 'Selected ▲' : 'View info +'}
+              </span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      updateRedProgress();
+    }
+
+    function selectPokemon(id) {
+      selectedMonId = id;
+      renderDetailDrawer();
+      renderRedRoster();
+    }
+
+    function toggleMonReady(id) {
+      completedMons[id] = !completedMons[id];
+      try {
+        localStorage.setItem(STORAGE_KEY_TEAM, JSON.stringify(completedMons));
+      } catch (e) {
+        // Ignore private storage errors
+      }
+      renderDetailDrawer();
+      renderRedRoster();
+    }
+
+    function updateRedProgress() {
+      const count = redTeamRoster.filter((m) => completedMons[m.id]).length;
+      const countEl = document.getElementById('red-ready-count');
+      const barEl = document.getElementById('red-progress-bar');
+      if (countEl) countEl.textContent = count;
+      if (barEl) barEl.style.width = `${(count / 6) * 100}%`;
+    }
+
+    function copyTextFallback(text, message) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showCopyToast(message);
+      } catch (err) {
+        showCopyToast('Unable to copy');
+      }
+      document.body.removeChild(textarea);
+    }
+
+    function copySingleSet(id) {
+      const mon = redTeamRoster.find((m) => m.id === id);
+      if (!mon) return;
+      copyTextFallback(mon.showdown, `${mon.name} set copied!`);
+    }
+
+    let toastTimeout;
+    function showCopyToast(text) {
+      const toast = document.getElementById('copy-toast');
+      const toastText = document.getElementById('copy-toast-text');
+      if (!toast || !toastText) return;
+      toastText.textContent = text;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 2200);
+    }
+
+    // Initial render
+    renderDetailDrawer();
+    renderRedRoster();
+    renderRivalDetail();
+    renderRedRivalGrid();
+  </script>
+</body>
+</html>
